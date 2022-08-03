@@ -224,7 +224,7 @@ export class Ceramic implements CeramicApi {
       this._streamHandlers
     )
     const pinStore = modules.pinStoreFactory.createPinStore()
-    const localIndex = new LocalIndexApi(modules.indexing, this.repository, this._logger)
+    //const localIndex = new LocalIndexApi(modules.indexing, this.repository, this._logger)
     this.repository.setDeps({
       dispatcher: this.dispatcher,
       pinStore: pinStore,
@@ -232,9 +232,7 @@ export class Ceramic implements CeramicApi {
       handlers: this._streamHandlers,
       anchorService: modules.anchorService,
       conflictResolution: conflictResolution,
-      indexing: localIndex,
     })
-    this._index = localIndex //new LocalIndexApi(modules.indexing, this.repository, this._logger)
   }
 
   get index(): IndexApi {
@@ -526,7 +524,6 @@ export class Ceramic implements CeramicApi {
       }
 
       await this._anchorValidator.init(this._supportedChains ? this._supportedChains[0] : null)
-      await this._index.init()
 
       await this._startupChecks()
     } catch (err) {
@@ -628,7 +625,7 @@ export class Ceramic implements CeramicApi {
       this.repository.updates$
     )
 
-    await this.repository.indexStreamIfNeeded(state$)
+    await this.repository.stateManager.indexStreamIfNeeded(state$)
 
     return stream
   }
@@ -669,7 +666,7 @@ export class Ceramic implements CeramicApi {
       this.repository.updates$
     )
 
-    await this.repository.indexStreamIfNeeded(state$)
+    await this.repository.stateManager.indexStreamIfNeeded(state$)
 
     return stream
   }
@@ -861,7 +858,6 @@ export class Ceramic implements CeramicApi {
     this._shutdownController.abort()
     await this.dispatcher.close()
     await this.repository.close()
-    await this._index.close()
     this._ipfsTopology.stop()
     this._logger.imp('Ceramic instance closed successfully')
   }

@@ -14,6 +14,8 @@ import {
   RunningStateLike,
   DiagnosticsLogger,
   StreamUtils,
+  CommitType,
+  IndexApi,
 } from '@ceramicnetwork/common'
 import { RunningState } from './running-state.js'
 import type { CID } from 'multiformats/cid'
@@ -33,6 +35,7 @@ export class StateManager {
    * @private
    */
   private readonly syncedPinnedStreams: Set<string> = new Set()
+  private readonly _index: LocalIndexApi
 
   /**
    * @param dispatcher - currently used instance of Dispatcher
@@ -43,7 +46,6 @@ export class StateManager {
    * @param logger - Logger
    * @param fromMemoryOrStore - load RunningState from in-memory cache or from state store, see `Repository#fromMemoryOrStore`.
    * @param load - `Repository#load`
-   * @param indexStreamIfNeeded - `Repository#indexStreamIfNeeded`
    */
   constructor(
     private readonly dispatcher: Dispatcher,
@@ -56,10 +58,15 @@ export class StateManager {
     private readonly load: (
       streamId: StreamID,
       opts?: LoadOpts | CreateOpts
-    ) => Promise<RunningState>,
-    private readonly indexStreamIfNeeded,
-    private readonly _index: LocalIndexApi | undefined
-  ) {}
+    ) => Promise<RunningState>
+  ) {
+
+    //this._index = new LocalIndexApi(modules.indexing, this.repository, this.logger)
+  }
+
+  get index(): IndexApi {
+    return this._index
+  }
 
   /**
    * Returns whether the given StreamID corresponds to a pinned stream that has been synced at least
@@ -157,6 +164,39 @@ export class StateManager {
     if (publish) {
       this.publishTip(state$)
     }
+  }
+
+  /**
+   * Helper function to add stream to db index if it has a 'model' in its metadata.
+   * @param state$
+   * @public
+   */
+  public async indexStreamIfNeeded(state$: RunningState): Promise<void> {
+    if (!state$.value.metadata.model) {
+      return
+    }
+
+    //const localIndex = new LocalIndexApi(modules.indexing, this.repository, this.logger)
+    await this._index.init()
+    const asDate = (unixTimestamp: number | null | undefined) => {
+      return unixTimestamp ? new Date(unixTimestamp * 1000) : null
+    }
+
+    // TODO(NET-1614) Test that the timestamps are correctly passed to the Index API.
+    const lastAnchor = asDate(state$.value.anchorProof?.blockTimestamp)
+    const firstAnchor = asDate(
+      state$.value.log.find((log) => log.type == CommitType.ANCHOR)?.timestamp
+    )
+    const STREAM_CONTENT = {
+      model: state$.value.metadata.model,
+      streamID: state$.id,
+      controller: state$.value.metadata.controller,
+      lastAnchor: lastAnchor,
+      firstAnchor: firstAnchor,
+    }
+
+    await this._index.indexStream(STREAM_CONTENT)
+    await this._index.close()
   }
 
   /**

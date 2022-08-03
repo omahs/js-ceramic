@@ -174,7 +174,7 @@ describe('Ceramic API', () => {
       const CONTENT1 = { myData: 1 }
 
       // TODO (NET-1614): Extend with targeted payload comparison
-      const addIndexSpy = jest.spyOn(ceramic.repository, 'indexStreamIfNeeded')
+      const addIndexSpy = jest.spyOn(ceramic.repository.stateManager, 'indexStreamIfNeeded')
       const model = await Model.create(ceramic, MODEL_DEFINITION)
       expect(addIndexSpy).toBeCalledTimes(1)
       const midMetadata = { model: model.id }
